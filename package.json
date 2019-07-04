@@ -1,0 +1,32 @@
+{
+  "name": "node_ssh_client",
+  "version": "1.0.0",
+  "description": "Console ssh client on NodeJs",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kotainer/node_ssh_client.git"
+  },
+  "author": "Butkov Viktor <bvn0293@gmail.com>",
+  "license": "SEE LICENSE IN LICENCE",
+  "bugs": {
+    "url": "https://github.com/kotainer/node_ssh_client/issues"
+  },
+  "homepage": "https://github.com/kotainer/node_ssh_client#readme",
+  "dependencies": {
+    "app-root-path": "^2.2.1",
+    "fs-extra": "^8.1.0",
+    "minimist": "^1.2.0",
+    "ora": "^3.4.0",
+    "ssh2": "^0.8.4"
+  },
+  "devDependencies": {
+    "eslint": "^5.3.0",
+    "eslint-config-airbnb": "^17.1.1",
+    "eslint-plugin-import": "^2.18.0"
+  }
+}
