@@ -1,4 +1,3 @@
-// node src/index.js 'root:kkAvSTw!ER0kvP@151.248.123.203'
 const minimist = require('minimist');
 
 const { parseConfig } = require('./utils/helpers');

@@ -2,6 +2,7 @@ const ora = require('ora');
 const SSH2 = require('ssh2').Client;;
 const readline = require('readline');
 const appRoot = require('app-root-path');
+const fs = require('fs')
 
 const {
   getTimeString,
@@ -21,7 +22,7 @@ class SSHClient {
   }
 
   async connect() {
-    console.log(`${getTimeString()} Connecting to ${this.config.host}`);
+    process.stdout.write(`${getTimeString()} Connecting to ${this.config.host}\n`);
 
     this.spinner.start();
     this.connection = new SSH2();
@@ -29,7 +30,7 @@ class SSHClient {
 
     this.connection.on('ready', () => {
       this.spinner.stop();
-      console.log(`${getTimeString()} Connection successful`);
+      process.stdout.write(`${getTimeString()} Connection successful\n`);
       this.openShell();
     });
   }
@@ -57,6 +58,8 @@ class SSHClient {
 
         if (clearLine.startsWith('get ')) {
           this.getFile(clearLine.replace('get ', ''));
+        } else if (clearLine.startsWith('put ')) {
+          this.putFile(clearLine.replace('put ', ''));
         } else {
           this.stream.write(clearLine + '\n');
         }
@@ -70,7 +73,7 @@ class SSHClient {
   }
 
   exit() {
-    console.log(`${getTimeString()} Connection closed`);
+    process.stdout.write(`${getTimeString()} Connection closed\n`);
     this.connection.end();
     process.exit(0);
   }
@@ -78,7 +81,9 @@ class SSHClient {
   async getSFTP() {
     return new Promise((resolve) => {
       this.connection.sftp((err, sftp) => {
-        if (err) throw err;
+        if (err) {
+          throw new Error(err);
+        }
 
         resolve(sftp);
       });
@@ -86,23 +91,64 @@ class SSHClient {
   }
 
   async getFile(fileName) {
-    const currentRemotePath = await this.exec('pwd');
-    console.log(`${getTimeString()} Downloading from ${this.config.host}:${currentRemotePath}/${fileName} to 127.0.0.1:/${this.downloadPath}/${fileName}`);
-    this.spinner.start();
-    const sftp = await this.getSFTP();
+    try {
+      const currentRemotePath = await this.exec('pwd');
+      process.stdout.write(`${getTimeString()} Downloading from ${this.config.host}:${currentRemotePath}/${fileName} to 127.0.0.1:/${this.downloadPath}/${fileName}\n`);
+      this.spinner.start();
+      const sftp = await this.getSFTP();
 
-    await ensureDownloadDir(this.downloadPath);
-    await new Promise((resolve) => {
-      sftp.fastGet(`${currentRemotePath}/${fileName}`, `${this.downloadPath}/${fileName}`, (e) => {
-        if (e) throw e;
+      await ensureDownloadDir(this.downloadPath);
+      await new Promise((resolve, reject) => {
+        sftp.fastGet(`${currentRemotePath}/${fileName}`, `${this.downloadPath}/${fileName}`, (e) => {
+          if (e) {
+            return reject(e)
+          }
 
-        resolve();
+          process.stdout.write(`${getTimeString()} File is downloaded successfully\n`);
+          resolve();
+        })
+      }).catch((e) => {
+        this.spinner.stop();
+        if (e && e.message === 'No such file') {
+          process.stdout.write(`${getTimeString()} No such file ${currentRemotePath}/${fileName}\n`);
+        }
+      });
+
+      this.spinner.stop();
+      this.stream.write('false\n');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async putFile(path) {
+    try {
+      const currentRemotePath = await this.exec('pwd');
+      process.stdout.write(`${getTimeString()} Uploading ${path} to ${this.config.host}:${currentRemotePath}/${fileName}\n`);
+      this.spinner.start();
+      
+      const fileName = '';
+      const sftp = await this.getSFTP();
+      const readStream = fs.createReadStream(path);
+      const writeStream = sftp.createWriteStream(`${currentRemotePath}/${fileName}`);
+
+      await new Promise((resolve) => {
+        readStream.pipe(writeStream);
+
+        writeStream.on('close', () => {
+          this.spinner.stop();
+          process.stdout.write(`${getTimeString()} File uploading complete\n`);
+        });
+
+        writeStream.on('end', () => {
+          return resolve();
+        });
       })
-    });
 
-    this.spinner.stop();
-    console.log(`${getTimeString()} File is downloaded successfully`);
-    this.stream.write('false\n');
+      this.stream.write('false\n');
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async exec(command, options = {}) {
