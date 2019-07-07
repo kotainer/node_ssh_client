@@ -19,11 +19,16 @@ class SSHClient {
    * @this  {SSHClient}
    * @param {object} config - Конфиг подключения
    * @param {object} options - Дополнительные параметры
-   * @param {object} options.forwardOut - Активация проброса портов
-   * @param {object} options.forwardOut.localHost - Локальный хост для проброса
-   * @param {object} options.forwardOut.localPort - Локальный порт для проброса
-   * @param {object} options.forwardOut.forwardHost - Удалённый хост для проброса
-   * @param {object} options.forwardOut.forwardPort - Удалённый порт для проброса
+   * @param {object} options.forwardOut - Активация проброса портов на удаленный сервер
+   * @param {string} options.forwardOut.localHost - Локальный хост для проброса
+   * @param {string} options.forwardOut.localPort - Локальный порт для проброса
+   * @param {string} options.forwardOut.forwardHost - Удалённый хост для проброса
+   * @param {string} options.forwardOut.forwardPort - Удалённый порт для проброса
+   * @param {object} options.forwardIn - Активация проброса портов с удалённого
+   * @param {string} options.forwardIn.localHost - Локальный хост для проброса
+   * @param {string} options.forwardIn.localPort - Локальный порт для проброса
+   * @param {string} options.forwardIn.forwardHost - Удалённый хост для проброса
+   * @param {string} options.forwardIn.forwardPort - Удалённый порт для проброса
    */
   constructor(config, options = {}) {
     this.spinner = ora();
@@ -251,7 +256,7 @@ class SSHClient {
     forwardHost,
     forwardPort,
   }) {
-    this.connection.forwardIn(forwardHost, forwardPort, (err, port) => {
+    this.connection.forwardIn(forwardHost, forwardPort, (err) => {
       if (err) {
         return this.exit(`Error forwarding connection: ${err.message}`);
       }
