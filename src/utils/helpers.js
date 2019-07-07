@@ -14,6 +14,27 @@ function parseConfig(connetionString) {
   }
 }
 
+// [-L [bind_address:]port:host:hostport]
+function parseForwardConfig(paramsString) {
+  if (!paramsString.match(/\d{1,}:\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}:\d{1,}$/)) {
+    throw new Error('Invalid forward params');
+  }
+
+  const elems = paramsString.split(':');
+  
+  const localHost = elems.length === 4 ? elems[0] : '::1';
+  const localPort = elems.length === 4 ? elems[1] : elems[0];
+  const forwardHost = elems.length === 4 ? elems[2] : elems[1];
+  const forwardPort = elems.length === 4 ? elems[3] : elems[2];
+
+  return {
+    localHost,
+    localPort,
+    forwardHost,
+    forwardPort,
+  }
+}
+
 function getTimeString() {
   const now = new Date();
 
@@ -40,4 +61,5 @@ module.exports = {
   parseConfig,
   getTimeString,
   ensureDownloadDir,
+  parseForwardConfig,
 }

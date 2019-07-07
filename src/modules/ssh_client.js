@@ -2,8 +2,9 @@ const ora = require('ora');
 const SSH2 = require('ssh2').Client;;
 const readline = require('readline');
 const appRoot = require('app-root-path');
-const fs = require('fs')
-const path = require('path')
+const fs = require('fs');
+const path = require('path');
+const net = require('net');
 
 const {
   getTimeString,
@@ -11,7 +12,20 @@ const {
 } = require('../utils/helpers');
 
 class SSHClient {
-  constructor(config) {
+  /**
+   * Создает SSH подключение.
+   *
+   * @constructor
+   * @this  {SSHClient}
+   * @param {object} config - Конфиг подключения
+   * @param {object} options - Дополнительные параметры
+   * @param {object} options.forwardOut - Активация проброса портов
+   * @param {object} options.forwardOut.localHost - Локальный хост для проброса
+   * @param {object} options.forwardOut.localPort - Локальный порт для проброса
+   * @param {object} options.forwardOut.forwardHost - Удалённый хост для проброса
+   * @param {object} options.forwardOut.forwardPort - Удалённый порт для проброса
+   */
+  constructor(config, options = {}) {
     this.spinner = ora();
     this.connection = null;
     this.stream = null;
@@ -19,21 +33,29 @@ class SSHClient {
     this.rl = readline.createInterface(process.stdin);
     this.downloadPath = appRoot.path + '/downloads';
 
-    this.connect();
+    this.connect(options);
   }
 
-  async connect() {
-    process.stdout.write(`${getTimeString()} Connecting to ${this.config.host}\n`);
+  async connect(options) {
+    try {
+      process.stdout.write(`${getTimeString()} Connecting to ${this.config.host}\n`);
 
-    this.spinner.start();
-    this.connection = new SSH2();
-    this.connection.connect(this.config);
+      this.spinner.start();
+      this.connection = new SSH2();
+      this.connection.connect(this.config);
 
-    this.connection.on('ready', () => {
-      this.spinner.stop();
-      process.stdout.write(`${getTimeString()} Connection successful\n`);
-      this.openShell();
-    });
+      this.connection.on('ready', () => {
+        this.spinner.stop();
+        process.stdout.write(`${getTimeString()} Connection successful\n`);
+        this.openShell();
+
+        if (options && options.forwardOut) {
+          this.forwardOut(options.forwardOut);
+        }
+      });
+    } catch (e) {
+      process.stdout.write(`${getTimeString()} ERROR ${e.message}\n`);
+    }
   }
 
   openShell() {
@@ -166,6 +188,38 @@ class SSHClient {
         });
       });
     });
+  }
+
+  forwardOut({
+    localHost = '::1',
+    localPort,
+    forwardHost,
+    forwardPort,
+  }) {
+    if (!localPort || !forwardHost || !forwardPort) {
+      process.stdout.write(`${getTimeString()} Missed forwarding params\n`);
+      return this.exit();
+    }
+
+    this.forwardServer = net.createServer((sock) => {
+      this.connection.forwardOut(sock.remoteAddress,
+        sock.remotePort,
+        forwardHost,
+        forwardPort,
+        (err, stream) => {
+          if (err) {
+            process.stdout.write(`${getTimeString()} Error forwarding connection: ${err.message}\n`);
+
+            sock.end();
+            return this.exit();
+
+          }
+
+          sock.pipe(stream).pipe(sock);
+        });
+    });
+
+    this.forwardServer.listen(localPort, localHost);
   }
 }
 
