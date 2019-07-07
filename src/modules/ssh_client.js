@@ -16,7 +16,7 @@ class SSHClient {
     this.connection = null;
     this.stream = null;
     this.config = config;
-    this.rl = readline.createInterface(process.stdin, process.stdout);
+    this.rl = readline.createInterface(process.stdin);
     this.downloadPath = appRoot.path + '/downloads';
 
     this.connect();
@@ -40,6 +40,7 @@ class SSHClient {
     this.connection.shell((err, stream) => {
       if (err) throw err;
       this.stream = stream;
+      this.stream.write('stty -echo\n');
 
       this.stream
         .on('close', () => {
@@ -101,6 +102,7 @@ class SSHClient {
       await ensureDownloadDir(this.downloadPath);
       await new Promise((resolve, reject) => {
         sftp.fastGet(`${currentRemotePath}/${fileName}`, `${this.downloadPath}/${fileName}`, (e) => {
+          this.spinner.stop();
           if (e) {
             return reject(e)
           }
@@ -115,7 +117,6 @@ class SSHClient {
         }
       });
 
-      this.spinner.stop();
       this.stream.write('false\n');
     } catch (e) {
       console.error(e);
