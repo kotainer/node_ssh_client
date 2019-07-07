@@ -30,6 +30,7 @@ class SSHClient {
     this.connection = null;
     this.stream = null;
     this.forwardOutServer = null;
+    this.forwardInSocket = null;
     this.config = config;
     this.rl = readline.createInterface(process.stdin);
     this.downloadPath = appRoot.path + '/downloads';
@@ -52,6 +53,10 @@ class SSHClient {
 
         if (options && options.forwardOut) {
           this.forwardOut(options.forwardOut);
+        }
+
+        if (options && options.forwardIn) {
+          this.forwardIn(options.forwardIn);
         }
       });
     } catch (e) {
@@ -91,13 +96,13 @@ class SSHClient {
       })
 
       this.rl.on('SIGINT', () => {
-        // this.stream.write('\x03');
-        this.exit();
+        this.stream.write('\x03');
+        // this.exit();
       })
     });
   }
 
-  exit() {
+  exit(message) {
     process.stdout.write(`${getTimeString()} Connection closed\n`);
     this.connection.end();
 
@@ -107,6 +112,14 @@ class SSHClient {
 
     if (this.forwardOutSock) {
       this.forwardOutSock.end();
+    }
+
+    if (this.forwardInSocket) {
+      this.forwardInSocket.end();
+    }
+
+    if (message) {
+      process.stdout.write(`${getTimeString()} ${message} \n`);
     }
 
     process.exit(0);
@@ -207,8 +220,7 @@ class SSHClient {
     forwardPort,
   }) {
     if (!localPort || !forwardHost || !forwardPort) {
-      process.stdout.write(`${getTimeString()} Missed forwarding params\n`);
-      return this.exit();
+      return this.exit('Missed forwarding params');
     }
 
     this.forwardOutServer = net.createServer((sock) => {
@@ -219,9 +231,7 @@ class SSHClient {
         forwardPort,
         (err, stream) => {
           if (err) {
-            process.stdout.write(`${getTimeString()} Error forwarding connection: ${err.message}\n`);
-
-            return this.exit();
+            return this.exit(`Error forwarding connection: ${err.message}`);
           }
 
           sock.pipe(stream).pipe(sock);
@@ -231,9 +241,37 @@ class SSHClient {
     this.forwardOutServer.listen(localPort, localHost);
 
     this.forwardOutServer.on('error', (err) => {
-      process.stdout.write(`${getTimeString()} Error forwarding connection: ${err.message}\n`);
-      return this.exit();
-   })
+      return this.exit(`Error forwarding connection: ${err.message}`);
+    });
+  }
+
+  forwardIn({
+    localHost = '127.0.0.1',
+    localPort,
+    forwardHost,
+    forwardPort,
+  }) {
+    this.connection.forwardIn(forwardHost, forwardPort, (err, port) => {
+      if (err) {
+        return this.exit(`Error forwarding connection: ${err.message}`);
+      }
+
+      this.connection.on('tcp connection', (info, accept) => {
+        this.forwardInSocket = new net.Socket();
+        this.forwardInSocket.connect(localPort, localHost, (err) => {
+          if (err) {
+            return this.exit(`Error forwarding connection: ${err.message}`);
+          }
+
+          const remote = accept();
+          this.forwardInSocket.pipe(remote).pipe(this.forwardInSocket);
+        });
+
+        this.forwardInSocket.on('error', (err) => {
+          return this.exit(`Error forwarding connection: ${err.message}`);
+        });
+      });
+    });
   }
 }
 

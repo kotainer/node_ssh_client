@@ -22,7 +22,7 @@ function parseForwardConfig(paramsString) {
 
   const elems = paramsString.split(':');
   
-  const localHost = elems.length === 4 ? elems[0] : '::1';
+  const localHost = elems.length === 4 ? elems[0] : '127.0.0.1';
   const localPort = elems.length === 4 ? elems[1] : elems[0];
   const forwardHost = elems.length === 4 ? elems[2] : elems[1];
   const forwardPort = elems.length === 4 ? elems[3] : elems[2];
