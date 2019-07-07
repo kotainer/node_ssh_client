@@ -29,6 +29,7 @@ class SSHClient {
     this.spinner = ora();
     this.connection = null;
     this.stream = null;
+    this.forwardOutServer = null;
     this.config = config;
     this.rl = readline.createInterface(process.stdin);
     this.downloadPath = appRoot.path + '/downloads';
@@ -99,6 +100,15 @@ class SSHClient {
   exit() {
     process.stdout.write(`${getTimeString()} Connection closed\n`);
     this.connection.end();
+
+    if (this.forwardOutServer) {
+      this.forwardOutServer.close();
+    }
+
+    if (this.forwardOutSock) {
+      this.forwardOutSock.end();
+    }
+
     process.exit(0);
   }
 
@@ -201,7 +211,8 @@ class SSHClient {
       return this.exit();
     }
 
-    this.forwardServer = net.createServer((sock) => {
+    this.forwardOutServer = net.createServer((sock) => {
+      this.forwardOutSock = sock;
       this.connection.forwardOut(sock.remoteAddress,
         sock.remotePort,
         forwardHost,
@@ -210,16 +221,19 @@ class SSHClient {
           if (err) {
             process.stdout.write(`${getTimeString()} Error forwarding connection: ${err.message}\n`);
 
-            sock.end();
             return this.exit();
-
           }
 
           sock.pipe(stream).pipe(sock);
         });
     });
 
-    this.forwardServer.listen(localPort, localHost);
+    this.forwardOutServer.listen(localPort, localHost);
+
+    this.forwardOutServer.on('error', (err) => {
+      process.stdout.write(`${getTimeString()} Error forwarding connection: ${err.message}\n`);
+      return this.exit();
+   })
   }
 }
 
