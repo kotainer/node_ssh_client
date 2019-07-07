@@ -3,6 +3,7 @@ const SSH2 = require('ssh2').Client;;
 const readline = require('readline');
 const appRoot = require('app-root-path');
 const fs = require('fs')
+const path = require('path')
 
 const {
   getTimeString,
@@ -121,15 +122,16 @@ class SSHClient {
     }
   }
 
-  async putFile(path) {
+  async putFile(filePath) {
     try {
       const currentRemotePath = await this.exec('pwd');
-      process.stdout.write(`${getTimeString()} Uploading ${path} to ${this.config.host}:${currentRemotePath}/${fileName}\n`);
+      const fileName = path.basename(filePath);
+
+      process.stdout.write(`${getTimeString()} Uploading ${filePath} to ${this.config.host}:${currentRemotePath}/${fileName}\n`);
       this.spinner.start();
-      
-      const fileName = '';
+
       const sftp = await this.getSFTP();
-      const readStream = fs.createReadStream(path);
+      const readStream = fs.createReadStream(filePath);
       const writeStream = sftp.createWriteStream(`${currentRemotePath}/${fileName}`);
 
       await new Promise((resolve) => {
@@ -138,12 +140,9 @@ class SSHClient {
         writeStream.on('close', () => {
           this.spinner.stop();
           process.stdout.write(`${getTimeString()} File uploading complete\n`);
-        });
-
-        writeStream.on('end', () => {
           return resolve();
         });
-      })
+      });
 
       this.stream.write('false\n');
     } catch (e) {
