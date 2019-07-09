@@ -45,6 +45,9 @@ class SSHClient {
     this.downloadPath = appRoot.path + '/downloads';
     this.isInternalOut = false;
     this.internalCb = null;
+    this.arrowButton = [
+      'up', 'down', 'left', 'right',
+    ]
 
     this.connect(options);
   }
@@ -111,9 +114,15 @@ class SSHClient {
       })
 
       this.rl.on('SIGINT', () => {
-        // this.stream.write('\x03');
-        this.exit();
+        this.stream.write('\x03');
+        // this.exit();
       })
+
+      process.stdin.on('keypress', (s, key) => {
+        if (this.arrowButton.includes(key.name) || key.ctrl || key.meta) {
+          this.stream.write(key.sequence);
+        }
+      });
     });
   }
 
@@ -285,7 +294,7 @@ class SSHClient {
   }
 
   completer(line) {
-    const commandlist = ['get', 'put', 'dir'];
+    const commandlist = ['get', 'put'];
     const hits = commandlist.filter(c => c.startsWith(line));
 
     // show all completions if none found
