@@ -37,8 +37,14 @@ class SSHClient {
     this.forwardOutServer = null;
     this.forwardInSocket = null;
     this.config = config;
-    this.rl = readline.createInterface(process.stdin);
+    this.rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      completer: this.completer
+    });
     this.downloadPath = appRoot.path + '/downloads';
+    this.isInternalOut = false;
+    this.internalCb = null;
 
     this.connect(options);
   }
@@ -80,6 +86,10 @@ class SSHClient {
           this.exit()
         })
         .on('data', (data) => {
+          if (this.isInternalOut) {
+            return this.internalCb('' + data);
+          }
+
           process.stdin.pause();
           process.stdout.write(data);
           process.stdin.resume();
@@ -101,8 +111,8 @@ class SSHClient {
       })
 
       this.rl.on('SIGINT', () => {
-        this.stream.write('\x03');
-        // this.exit();
+        // this.stream.write('\x03');
+        this.exit();
       })
     });
   }
@@ -144,8 +154,8 @@ class SSHClient {
 
   async getFile(fileName) {
     try {
-      const currentRemotePath = await this.exec('pwd');
-      process.stdout.write(`${getTimeString()} Downloading from ${this.config.host}:${currentRemotePath}/${fileName} to 127.0.0.1:/${this.downloadPath}/${fileName}\n`);
+      const currentRemotePath = await this.getCurrentDir();
+      process.stdout.write(`${getTimeString()} Downloading from ${this.config.host}:${currentRemotePath}/${fileName} to 127.0.0.1:${this.downloadPath}/${fileName}\n`);
       this.spinner.start();
       const sftp = await this.getSFTP();
 
@@ -175,7 +185,7 @@ class SSHClient {
 
   async putFile(filePath) {
     try {
-      const currentRemotePath = await this.exec('pwd');
+      const currentRemotePath = await this.getCurrentDir();
       const fileName = path.basename(filePath);
 
       process.stdout.write(`${getTimeString()} Uploading ${filePath} to ${this.config.host}:${currentRemotePath}/${fileName}\n`);
@@ -201,21 +211,16 @@ class SSHClient {
     }
   }
 
-  async exec(command, options = {}) {
+  async getCurrentDir() {
     return new Promise((resolve) => {
-      this.connection.exec(command, options, (err, channel) => {
-        if (err) throw err;
-        let result = '';
+      this.isInternalOut = true;
+      this.stream.write('pwd\n');
 
-        channel.on('data', (chunk) => {
-          result += chunk;
-        });
-
-        channel.on('close', () => {
-          resolve(result.replace('\n', ''));
-        });
-      });
-    });
+      this.internalCb = (data) => {
+        this.isInternalOut = false;
+        return resolve(data.substring(0, data.indexOf('\n')).replace('\r', ''));
+      };
+    }) 
   }
 
   forwardOut({
@@ -277,6 +282,14 @@ class SSHClient {
         });
       });
     });
+  }
+
+  completer(line) {
+    const commandlist = ['get', 'put', 'dir'];
+    const hits = commandlist.filter(c => c.startsWith(line));
+
+    // show all completions if none found
+    return [hits.length ? hits : commandlist, line];
   }
 }
 
