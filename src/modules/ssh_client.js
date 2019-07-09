@@ -73,8 +73,13 @@ class SSHClient {
           this.forwardIn(options.forwardIn);
         }
       });
+
+      this.connection.on('error', (err) => {
+        this.spinner.stop();
+        this.exit(`[ERROR] ${err.message}`);
+      });
     } catch (e) {
-      process.stdout.write(`${getTimeString()} ERROR ${e.message}\n`);
+      this.exit(`[ERROR] ${e.message}`);
     }
   }
 
@@ -127,6 +132,10 @@ class SSHClient {
   }
 
   exit(message) {
+    if (message) {
+      process.stdout.write(`${getTimeString()} ${message} \n`);
+    }
+
     process.stdout.write(`${getTimeString()} Connection closed\n`);
     this.connection.end();
 
@@ -140,10 +149,6 @@ class SSHClient {
 
     if (this.forwardInSocket) {
       this.forwardInSocket.end();
-    }
-
-    if (message) {
-      process.stdout.write(`${getTimeString()} ${message} \n`);
     }
 
     process.exit(0);

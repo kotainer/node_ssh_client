@@ -2,7 +2,7 @@ const fse = require('fs-extra');
 
 function parseConfig(connetionString) {
   if (!connetionString.match(/^\w{1,}:\S{1,}@\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}$/)) {
-    throw new Error('Invalid connection params');
+    throw new Error('Invalid connection params. Expected: [username:password@IPv4-address]');
   }
 
   return {
